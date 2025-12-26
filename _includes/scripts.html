@@ -1,3 +1,152 @@
 <script src="{{ base_path }}/assets/js/main.min.js"></script>
 
 {% include analytics.html %}
+
+<!-- Publications sayfası için DataTables script'i -->
+{% if page.url == "/publications/" or page.url == "/publications" %}
+<script>
+    // jQuery yüklendikten sonra çalış (main.min.js içinde jQuery var)
+    (function() {
+        function initPublicationsTable() {
+            // jQuery kontrolü
+            if (typeof jQuery === 'undefined') {
+                console.warn('jQuery henüz yüklenmedi, tekrar denenecek...');
+                setTimeout(initPublicationsTable, 100);
+                return;
+            }
+
+            var $ = jQuery;
+            console.log('Publications DataTables başlatılıyor, jQuery versiyonu:', $.fn.jquery);
+
+            // DataTables script'lerini dinamik olarak yükle
+            var scriptsToLoad = [
+                'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
+                'https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js',
+                'https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js'
+            ];
+
+            function loadScript(src, callback) {
+                // Script zaten yüklenmiş mi kontrol et
+                var existingScript = document.querySelector('script[src="' + src + '"]');
+                if (existingScript) {
+                    console.log('Script zaten yüklü:', src);
+                    if (callback) callback();
+                    return;
+                }
+
+                var script = document.createElement('script');
+                script.src = src;
+                script.onload = function() {
+                    console.log('Script yüklendi:', src);
+                    if (callback) callback();
+                };
+                script.onerror = function() {
+                    console.error('Script yüklenemedi:', src);
+                    if (callback) callback();
+                };
+                document.head.appendChild(script);
+            }
+
+            function loadNextScript(index) {
+                if (index >= scriptsToLoad.length) {
+                    // Tüm script'ler yüklendi, DataTable'ı başlat
+                    console.log('Tüm script\'ler yüklendi, DataTable başlatılıyor...');
+                    startDataTable();
+                    return;
+                }
+
+                loadScript(scriptsToLoad[index], function() {
+                    loadNextScript(index + 1);
+                });
+            }
+
+            function startDataTable() {
+                var $ = jQuery;
+                
+                // Tablo var mı kontrol et
+                if ($('#publicationsTable').length === 0) {
+                    console.error('Publications tablosu bulunamadı!');
+                    return;
+                }
+
+                // DataTable zaten başlatılmış mı kontrol et
+                if ($.fn.DataTable && $('#publicationsTable').hasClass('dataTable')) {
+                    console.log('DataTable zaten başlatılmış');
+                    return;
+                }
+
+                console.log('DataTable başlatılıyor...');
+
+                try {
+                    // DataTable Başlatma
+                    var table = $('#publicationsTable').DataTable({
+                        "order": [[ 0, "desc" ]], 
+                        "dom": 'rtip', 
+                        "paging": false,
+                        "language": {
+                            "sEmptyTable":     "Tabloda veri yok",
+                            "sInfo":           "Toplam _TOTAL_ yayından _START_ - _END_ arası gösteriliyor",
+                            "sInfoEmpty":      "Kayıt yok",
+                            "sInfoFiltered":   "(_MAX_ kayıt arasından filtrelendi)",
+                            "sLengthMenu":     "_MENU_ kayıt göster",
+                            "sLoadingRecords": "Yükleniyor...",
+                            "sProcessing":     "İşleniyor...",
+                            "sZeroRecords":    "Eşleşen yayın bulunamadı"
+                        }
+                    });
+
+                    console.log('DataTable başarıyla başlatıldı');
+
+                    // 1. Özel Arama Kutusu Bağlantısı
+                    $('#customSearch').off('keyup').on('keyup', function() {
+                        table.search(this.value).draw();
+                    });
+
+                    // 2. Yıl Filtresini Doldurma ve Bağlama
+                    var yearSelect = $('#filterYear');
+                    yearSelect.empty().append('<option value="">Tüm Yıllar</option>');
+                    table.column(0).data().unique().sort().reverse().each(function(d) {
+                        yearSelect.append('<option value="' + d + '">' + d + '</option>');
+                    });
+                    
+                    yearSelect.off('change').on('change', function() {
+                        var val = $.fn.dataTable.util.escapeRegex($(this).val());
+                        table.column(0).search(val ? '^' + val + '$' : '', true, false).draw();
+                    });
+
+                    // 3. Tür Filtresini Doldurma ve Bağlama
+                    var typeSelect = $('#filterType');
+                    typeSelect.empty().append('<option value="">Tüm Türler</option>');
+                    table.column(1).data().unique().sort().each(function(d) {
+                        var textVal = $('<div>').html(d).text().trim();
+                        // Aynı türden birden fazla eklememek için kontrol
+                        if (textVal && typeSelect.find("option[value='" + textVal + "']").length === 0) {
+                            typeSelect.append('<option value="' + textVal + '">' + textVal + '</option>');
+                        }
+                    });
+
+                    typeSelect.off('change').on('change', function() {
+                        var val = $.fn.dataTable.util.escapeRegex($(this).val());
+                        table.column(1).search(val ? val : '', true, false).draw();
+                    });
+
+                    console.log('Filtreler başarıyla bağlandı');
+                } catch (error) {
+                    console.error('DataTable başlatılırken hata:', error);
+                }
+            }
+
+            // Script'leri sırayla yükle
+            loadNextScript(0);
+        }
+
+        // DOM hazır olduğunda başlat (jQuery zaten yüklü)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPublicationsTable);
+        } else {
+            // DOM zaten hazırsa
+            initPublicationsTable();
+        }
+    })();
+</script>
+{% endif %}
