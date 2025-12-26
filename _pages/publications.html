@@ -667,27 +667,66 @@ author_profile: true
     </div>
 </div>
 
-<!-- DataTables ve Bootstrap JS - Tema'nın jQuery'si yüklendikten sonra çalışacak -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
-
 {% raw %}
 <script>
-    // Tema'nın jQuery'si yüklendikten sonra çalışması için window.load kullanıyoruz
-    // Bu, _includes/scripts.html'deki main.min.js yüklendikten sonra çalışır
+    // Script'leri dinamik olarak yükle - jQuery yüklendikten sonra
     (function() {
-        function initDataTable() {
+        var scriptsLoaded = {
+            bootstrap: false,
+            datatables: false,
+            datatablesBootstrap: false
+        };
+
+        function loadScript(src, callback) {
+            var script = document.createElement('script');
+            script.src = src;
+            script.onload = callback;
+            script.onerror = function() {
+                console.error('Script yüklenemedi: ' + src);
+            };
+            document.head.appendChild(script);
+        }
+
+        function checkAndLoadScripts() {
             // jQuery kontrolü - tema'nın jQuery'si yüklü mü?
             if (typeof jQuery === 'undefined') {
-                console.warn('jQuery henüz yüklenmedi, 100ms sonra tekrar denenecek...');
-                setTimeout(initDataTable, 100);
+                setTimeout(checkAndLoadScripts, 100);
                 return;
             }
 
-            var $ = jQuery; // Tema'nın jQuery'sini kullan
+            var $ = jQuery;
+            console.log("jQuery yüklendi, versiyon:", $.fn.jquery);
+
+            // Bootstrap JS yükle
+            if (!scriptsLoaded.bootstrap) {
+                scriptsLoaded.bootstrap = true;
+                loadScript('https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', function() {
+                    console.log('Bootstrap yüklendi');
+                });
+            }
+
+            // DataTables yükle
+            if (!scriptsLoaded.datatables) {
+                scriptsLoaded.datatables = true;
+                loadScript('https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js', function() {
+                    console.log('DataTables yüklendi');
+                    // DataTables Bootstrap eklentisini yükle
+                    if (!scriptsLoaded.datatablesBootstrap) {
+                        scriptsLoaded.datatablesBootstrap = true;
+                        loadScript('https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js', function() {
+                            console.log('DataTables Bootstrap yüklendi');
+                            // Tüm script'ler yüklendi, DataTable'ı başlat
+                            initDataTable();
+                        });
+                    }
+                });
+            }
+        }
+
+        function initDataTable() {
+            var $ = jQuery;
             
-            console.log("DataTables başlatılıyor. jQuery versiyonu:", $.fn.jquery);
+            console.log("DataTables başlatılıyor...");
 
             // DataTable Başlatma
             var table = $('#publicationsTable').DataTable({
@@ -738,15 +777,15 @@ author_profile: true
             });
         }
 
-        // DOM hazır olduğunda ve tema script'leri yüklendikten sonra çalıştır
+        // DOM hazır olduğunda kontrol et
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() {
                 // Tema'nın script'leri yüklenmesi için biraz bekle
-                setTimeout(initDataTable, 200);
+                setTimeout(checkAndLoadScripts, 200);
             });
         } else {
             // DOM zaten hazırsa
-            setTimeout(initDataTable, 200);
+            setTimeout(checkAndLoadScripts, 200);
         }
     })();
 </script>
