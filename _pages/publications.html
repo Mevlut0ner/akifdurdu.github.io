@@ -669,124 +669,139 @@ author_profile: true
 
 {% raw %}
 <script>
-    // Script'leri dinamik olarak yükle - jQuery yüklendikten sonra
-    (function() {
-        var scriptsLoaded = {
-            bootstrap: false,
-            datatables: false,
-            datatablesBootstrap: false
-        };
+    // Tüm kaynaklar yüklendikten sonra çalış (window.onload)
+    // Bu, tema'nın main.min.js'i de dahil tüm script'lerin yüklendiğinden emin olur
+    window.addEventListener('load', function() {
+        console.log('Sayfa tamamen yüklendi, DataTables başlatılıyor...');
+        
+        // jQuery kontrolü
+        if (typeof jQuery === 'undefined') {
+            console.error('jQuery bulunamadı! Tema script\'leri yüklenmemiş olabilir.');
+            return;
+        }
+
+        var $ = jQuery;
+        console.log('jQuery versiyonu:', $.fn.jquery);
+
+        // DataTables script'lerini dinamik olarak yükle
+        var scriptsToLoad = [
+            'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
+            'https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js',
+            'https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js'
+        ];
+
+        var loadedCount = 0;
+        var totalScripts = scriptsToLoad.length;
 
         function loadScript(src, callback) {
+            // Script zaten yüklenmiş mi kontrol et
+            var existingScript = document.querySelector('script[src="' + src + '"]');
+            if (existingScript) {
+                console.log('Script zaten yüklü:', src);
+                if (callback) callback();
+                return;
+            }
+
             var script = document.createElement('script');
             script.src = src;
-            script.onload = callback;
+            script.onload = function() {
+                console.log('Script yüklendi:', src);
+                loadedCount++;
+                if (callback) callback();
+            };
             script.onerror = function() {
-                console.error('Script yüklenemedi: ' + src);
+                console.error('Script yüklenemedi:', src);
+                loadedCount++;
+                if (callback) callback();
             };
             document.head.appendChild(script);
         }
 
-        function checkAndLoadScripts() {
-            // jQuery kontrolü - tema'nın jQuery'si yüklü mü?
-            if (typeof jQuery === 'undefined') {
-                setTimeout(checkAndLoadScripts, 100);
+        function loadNextScript(index) {
+            if (index >= scriptsToLoad.length) {
+                // Tüm script'ler yüklendi, DataTable'ı başlat
+                console.log('Tüm script\'ler yüklendi, DataTable başlatılıyor...');
+                initDataTable();
                 return;
             }
 
-            var $ = jQuery;
-            console.log("jQuery yüklendi, versiyon:", $.fn.jquery);
-
-            // Bootstrap JS yükle
-            if (!scriptsLoaded.bootstrap) {
-                scriptsLoaded.bootstrap = true;
-                loadScript('https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', function() {
-                    console.log('Bootstrap yüklendi');
-                });
-            }
-
-            // DataTables yükle
-            if (!scriptsLoaded.datatables) {
-                scriptsLoaded.datatables = true;
-                loadScript('https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js', function() {
-                    console.log('DataTables yüklendi');
-                    // DataTables Bootstrap eklentisini yükle
-                    if (!scriptsLoaded.datatablesBootstrap) {
-                        scriptsLoaded.datatablesBootstrap = true;
-                        loadScript('https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js', function() {
-                            console.log('DataTables Bootstrap yüklendi');
-                            // Tüm script'ler yüklendi, DataTable'ı başlat
-                            initDataTable();
-                        });
-                    }
-                });
-            }
+            loadScript(scriptsToLoad[index], function() {
+                loadNextScript(index + 1);
+            });
         }
 
         function initDataTable() {
             var $ = jQuery;
             
-            console.log("DataTables başlatılıyor...");
+            // DataTable zaten başlatılmış mı kontrol et
+            if ($.fn.DataTable && $('#publicationsTable').length && $('#publicationsTable').hasClass('dataTable')) {
+                console.log('DataTable zaten başlatılmış');
+                return;
+            }
 
-            // DataTable Başlatma
-            var table = $('#publicationsTable').DataTable({
-                "order": [[ 0, "desc" ]], 
-                "dom": 'rtip', 
-                "paging": false,
-                "language": {
-                    "sEmptyTable":     "Tabloda veri yok",
-                    "sInfo":           "Toplam _TOTAL_ yayından _START_ - _END_ arası gösteriliyor",
-                    "sInfoEmpty":      "Kayıt yok",
-                    "sInfoFiltered":   "(_MAX_ kayıt arasından filtrelendi)",
-                    "sLengthMenu":     "_MENU_ kayıt göster",
-                    "sLoadingRecords": "Yükleniyor...",
-                    "sProcessing":     "İşleniyor...",
-                    "sZeroRecords":    "Eşleşen yayın bulunamadı"
-                }
-            });
+            console.log('DataTable başlatılıyor...');
 
-            // 1. Özel Arama Kutusu Bağlantısı
-            $('#customSearch').on('keyup', function() {
-                table.search(this.value).draw();
-            });
+            try {
+                // DataTable Başlatma
+                var table = $('#publicationsTable').DataTable({
+                    "order": [[ 0, "desc" ]], 
+                    "dom": 'rtip', 
+                    "paging": false,
+                    "language": {
+                        "sEmptyTable":     "Tabloda veri yok",
+                        "sInfo":           "Toplam _TOTAL_ yayından _START_ - _END_ arası gösteriliyor",
+                        "sInfoEmpty":      "Kayıt yok",
+                        "sInfoFiltered":   "(_MAX_ kayıt arasından filtrelendi)",
+                        "sLengthMenu":     "_MENU_ kayıt göster",
+                        "sLoadingRecords": "Yükleniyor...",
+                        "sProcessing":     "İşleniyor...",
+                        "sZeroRecords":    "Eşleşen yayın bulunamadı"
+                    }
+                });
 
-            // 2. Yıl Filtresini Doldurma ve Bağlama
-            var yearSelect = $('#filterYear');
-            table.column(0).data().unique().sort().reverse().each(function(d) {
-                yearSelect.append('<option value="' + d + '">' + d + '</option>');
-            });
-            
-            yearSelect.on('change', function() {
-                var val = $.fn.dataTable.util.escapeRegex($(this).val());
-                table.column(0).search(val ? '^' + val + '$' : '', true, false).draw();
-            });
+                console.log('DataTable başarıyla başlatıldı');
 
-            // 3. Tür Filtresini Doldurma ve Bağlama
-            var typeSelect = $('#filterType');
-            table.column(1).data().unique().sort().each(function(d) {
-                var textVal = $('<div>').html(d).text();
-                // Aynı türden birden fazla eklememek için kontrol
-                if (typeSelect.find("option[value='" + textVal + "']").length === 0) {
-                     typeSelect.append('<option value="' + textVal + '">' + textVal + '</option>');
-                }
-            });
+                // 1. Özel Arama Kutusu Bağlantısı
+                $('#customSearch').off('keyup').on('keyup', function() {
+                    table.search(this.value).draw();
+                });
 
-            typeSelect.on('change', function() {
-                var val = $.fn.dataTable.util.escapeRegex($(this).val());
-                table.column(1).search(val ? val : '', true, false).draw();
-            });
+                // 2. Yıl Filtresini Doldurma ve Bağlama
+                var yearSelect = $('#filterYear');
+                yearSelect.empty().append('<option value="">Tüm Yıllar</option>');
+                table.column(0).data().unique().sort().reverse().each(function(d) {
+                    yearSelect.append('<option value="' + d + '">' + d + '</option>');
+                });
+                
+                yearSelect.off('change').on('change', function() {
+                    var val = $.fn.dataTable.util.escapeRegex($(this).val());
+                    table.column(0).search(val ? '^' + val + '$' : '', true, false).draw();
+                });
+
+                // 3. Tür Filtresini Doldurma ve Bağlama
+                var typeSelect = $('#filterType');
+                typeSelect.empty().append('<option value="">Tüm Türler</option>');
+                table.column(1).data().unique().sort().each(function(d) {
+                    var textVal = $('<div>').html(d).text().trim();
+                    // Aynı türden birden fazla eklememek için kontrol
+                    if (textVal && typeSelect.find("option[value='" + textVal + "']").length === 0) {
+                        typeSelect.append('<option value="' + textVal + '">' + textVal + '</option>');
+                    }
+                });
+
+                typeSelect.off('change').on('change', function() {
+                    var val = $.fn.dataTable.util.escapeRegex($(this).val());
+                    table.column(1).search(val ? val : '', true, false).draw();
+                });
+
+                console.log('Filtreler başarıyla bağlandı');
+            } catch (error) {
+                console.error('DataTable başlatılırken hata:', error);
+            }
         }
 
-        // DOM hazır olduğunda kontrol et
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function() {
-                // Tema'nın script'leri yüklenmesi için biraz bekle
-                setTimeout(checkAndLoadScripts, 200);
-            });
-        } else {
-            // DOM zaten hazırsa
-            setTimeout(checkAndLoadScripts, 200);
-        }
-    })();
+        // Script'leri sırayla yükle
+        loadNextScript(0);
+    });
 </script>
 {% endraw %}
